@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Life Game by JavaScript</title>
+  </head>
+  <body>
+    <h1>Life Game by JavaScript</h1>
+    <canvas id="canvas"></canvas>
+    <div id="performance"></div>
+    <script>
+
+      class LifeGame {
+        constructor(width, height) {
+          this.width = width;
+          this.height = height;
+          this._array0 = new Uint8Array(width * height);
+          this._array1 = new Uint8Array(width * height);
+          this._initialize();
+        }
+
+        _initialize() {
+          for (let i = 0; i < this.width * this.height; ++i) {
+            this._array0[i] = Math.random() > 0.5 ? 1 : 0;
+          }
+        }
+
+        update() {
+          for (let y = 0; y < this.height; ++y) {
+            const top = y != this.height - 1 ? y + 1 : 0;
+            const bottom = y != 0 ? y - 1 : this.height - 1;
+            for (let x = 0; x < this.width; ++x) {
+              const index = x + this.width * y;
+              const right = x != this.width - 1 ? x + 1 : 0;
+              const left = x != 0 ? x - 1 : this.width - 1;
+
+              const alive = this._array0[index];
+              let neighbors = 0;
+              neighbors += this._array0[left + this.width * top];
+              neighbors += this._array0[x + this.width * top];
+              neighbors += this._array0[right + this.width * top];
+              neighbors += this._array0[left + this.width * y];
+              neighbors += this._array0[right + this.width * y];
+              neighbors += this._array0[left + this.width * bottom];
+              neighbors += this._array0[x + this.width * bottom];
+              neighbors += this._array0[right + this.width * bottom];
+
+              if ((alive && (neighbors == 2 || neighbors == 3)) ||
+                  (!alive && neighbors == 3)) {
+                this._array1[index] = 1;
+              } else {
+                this._array1[index] = 0;
+              }
+            }
+          }
+          [this._array0, this._array1] = [this._array1, this._array0];
+        }
+
+        isAlive(x, y) {
+          return this._array0[x + this.width * y];
+        }
+      }
+
+      const canvasWidth = 512;
+      const canvasHeight = 512;
+
+      const canvas = document.getElementById('canvas');
+      canvas.width = canvasWidth;
+      canvas.height = canvasHeight;
+      const context = canvas.getContext('2d');
+
+      const lifeGame = new LifeGame(256, 256);
+
+      const rectSizeX = canvasWidth / lifeGame.width;
+      const rectSizeY = canvasHeight / lifeGame.height;
+      const render = () => {
+        context.fillStyle = '#000000';
+        context.fillRect(0, 0, canvasWidth, canvasHeight);
+        context.fillStyle = '#ffffff';
+        for (let y = 0; y < lifeGame.height; ++y) {
+          for (let x = 0; x < lifeGame.width; ++x) {
+            if (lifeGame.isAlive(x, y)) {
+              context.fillRect(x * rectSizeX, y * rectSizeY, rectSizeX, rectSizeY);
+            }
+          }
+        }
+      };
+
+      const divPerformance = document.getElementById('performance');
+
+      let count = 0;
+      const loop = () => {
+        requestAnimationFrame(loop);
+
+        const startTime = performance.now();
+        lifeGame.update();
+        const endTime = performance.now();
+        const elapsedTime = endTime - startTime;
+        if (count % 5 === 0) {
+          divPerformance.innerText = `Time(ms): ${elapsedTime}`;
+        }
+        render();
+        ++count;
+        count %= 5;
+      };
+      loop();
+
+    </script>
+  </body>
+</html>

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Life Game by WAT (WebAssembly Text Format)</title>
+  </head>
+  <body>
+    <h1>Life Game by WAT (WebAssembly Text Format)</h1>
+    <canvas id="canvas"></canvas>
+    <div id="performance"></div>
+    <script>
+      class LifeGameWasm {
+        constructor(width, height) {
+          this.width = width;
+          this.height = height;
+          this._cellNum = this.width * this.height;
+          const page = Math.ceil((2 * width * height) / 65536); // 1page = 64kiB = 65536B
+          this._memory = new WebAssembly.Memory({ initial: page });
+          this._array0 = new Uint8Array(this._memory.buffer, 0, this._cellNum);
+          this._array1 = new Uint8Array(this._memory.buffer, this._cellNum, this._cellNum);
+          this._flipped = false;
+          this._initialize();
+          this._wasm = null;
+        }
+
+        async prepare() {
+          const importObject = {
+            env: {
+              memory: this._memory,
+              width: this.width,
+              height: this.height
+            },
+          }
+          this._wasm = await WebAssembly.instantiateStreaming(fetch('./lifegame.wasm'), importObject)
+        }
+
+        _initialize() {
+          for (let i = 0; i < this.width * this.height; ++i) {
+            this._array0[i] = Math.random() > 0.5 ? 1 : 0;
+          }
+        }
+
+        update() {
+          if (!this._wasm) {
+            console.warn('LifeGameWasm#prepare must be called before LifeGameWasm#update.');
+            return;
+          }
+          if (!this._flipped) {
+            this._wasm.instance.exports.update(0, this._cellNum);
+          } else {
+            this._wasm.instance.exports.update(this._cellNum, 0);
+          }
+          this._flipped = !this._flipped;
+        }
+
+        isAlive(x, y) {
+          return this._array1[x + this.width * y];
+        }
+
+      }
+
+      const canvasWidth = 512;
+      const canvasHeight = 512;
+
+      const canvas = document.getElementById('canvas');
+      canvas.width = canvasWidth;
+      canvas.height = canvasHeight;
+      const context = canvas.getContext('2d');
+
+      (async () => {
+        const lifeGame = new LifeGameWasm(256, 256);
+        await lifeGame.prepare();
+
+        const rectSizeX = canvasWidth / lifeGame.width;
+        const rectSizeY = canvasHeight / lifeGame.height;
+        const render = () => {
+          context.fillStyle = '#000000';
+          context.fillRect(0, 0, canvasWidth, canvasHeight);
+          context.fillStyle = '#ffffff';
+          for (let y = 0; y < lifeGame.height; ++y) {
+            for (let x = 0; x < lifeGame.width; ++x) {
+              if (lifeGame.isAlive(x, y)) {
+                context.fillRect(x * rectSizeX, y * rectSizeY, rectSizeX, rectSizeY);
+              }
+            }
+          }
+        };
+
+        const divPerformance = document.getElementById('performance');
+
+        let count = 0;
+        const loop = () => {
+          requestAnimationFrame(loop);
+
+          const startTime = performance.now();
+          lifeGame.update();
+          const endTime = performance.now();
+          const elapsedTime = endTime - startTime;
+          if (count % 5 === 0) {
+            divPerformance.innerText = `Time(ms): ${elapsedTime}`;
+          }
+          render();
+          ++count;
+          count %= 5;
+          render();
+        };
+        loop();
+      })();
+
+    </script>
+  </body>
+</html>
